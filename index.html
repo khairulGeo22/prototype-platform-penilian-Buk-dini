@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Penilaian Keterampilan Riset</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Slate & Amber -->
+    <!-- Application Structure Plan: Aplikasi ini menggunakan struktur Single-Page Application (SPA) dengan pendekatan berbasis peran (role-based). Alur dimulai dari halaman login tunggal. Setelah otentikasi, tampilan akan berubah secara dinamis menjadi 'Dasbor Mahasiswa' atau 'Dasbor Dosen' tanpa memuat ulang halaman. Struktur ini dipilih karena efisien dan memberikan pengalaman pengguna yang mulus, memisahkan alur kerja yang sangat berbeda antara dua peran utama dalam satu lingkungan yang kohesif. Navigasi internal dikelola oleh JavaScript untuk menampilkan/menyembunyikan bagian yang relevan. -->
+    <!-- Visualization & Content Choices: 1. Daftar Tugas (Dosen): Menggunakan tabel HTML interaktif (bukan chart) karena tujuannya adalah untuk menampilkan data terstruktur (nama, judul, status) dan memungkinkan interaksi (klik untuk menilai). Ini lebih efektif daripada visualisasi untuk tujuan ini. 2. Ringkasan Nilai (Dosen): Menggunakan Bar Chart (Chart.js) untuk memberikan gambaran visual cepat tentang distribusi skor di kelas. Tujuannya adalah untuk analisis tren, di mana chart lebih unggul dari tabel. 3. Form Instrumen (Mahasiswa): Menggunakan form HTML standar dengan textarea untuk jawaban esai, karena tujuannya adalah pengumpulan data teks yang mendalam. 4. Rubrik Penilaian (Dosen): Menggunakan grup tombol radio interaktif untuk memungkinkan pemilihan skor yang mudah dan intuitif, langsung menerjemahkan dokumen sumber menjadi aksi UI. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .view { display: none; }
+        .active-view { display: block; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <!-- Login View -->
+        <div id="login-view" class="view active-view">
+            <div class="max-w-md mx-auto mt-10 bg-white p-8 rounded-xl shadow-md">
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl font-bold text-slate-900">Platform Penilaian Riset</h1>
+                    <p class="text-slate-500 mt-2">Silakan masuk untuk melanjutkan.</p>
+                </div>
+                <form id="login-form">
+                    <div class="mb-4">
+                        <label for="identifier" class="block text-sm font-medium text-slate-700 mb-1">Nama</label>
+                        <input type="text" id="identifier" name="identifier" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-amber-500 focus:border-amber-500" placeholder="Contoh: Mahasiswa atau Dosen">
+                    </div>
+                    <div class="mb-4">
+                        <label for="identifier" class="block text-sm font-medium text-slate-700 mb-1">NIM / NIDN</label>
+                        <input type="text" id="identifier" name="identifier" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-amber-500 focus:border-amber-500" placeholder="Contoh: 12345 (Mhs) atau 98765 (Dosen)">
+                    </div>
+                    <div class="mb-6">
+                        <label for="password" class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                        <input type="password" id="password" name="password" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-amber-500 focus:border-amber-500" value="password">
+                         <p class="text-xs text-slate-400 mt-1">Gunakan 'password' untuk semua akun demo.</p>
+                    </div>
+                    <button type="submit" class="w-full bg-amber-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-amber-600 transition duration-300">Masuk</button>
+                    <div id="login-error" class="text-red-500 text-sm mt-4 text-center"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main App View (Header + Content) -->
+        <div id="main-app-view" class="view">
+            <header class="bg-white p-4 rounded-xl shadow-md mb-8 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">Dasbor Penilaian Riset</h1>
+                    <p id="user-info" class="text-slate-600"></p>
+                </div>
+                <button id="logout-btn" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition duration-300">Keluar</button>
+            </header>
+
+            <!-- Student Dashboard -->
+            <div id="student-dashboard" class="hidden">
+                 <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-bold mb-4">Tugas Anda</h2>
+                    <p class="mb-6 text-slate-600">Pilih instrumen yang ingin Anda kerjakan atau lihat riwayat tugas yang telah dinilai.</p>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                            <h3 class="font-bold text-lg mb-2">Instrumen Kajian Pustaka</h3>
+                            <p class="text-sm text-slate-500 mb-4">Isi lembar kajian pustaka berdasarkan artikel yang telah Anda analisis.</p>
+                            <button onclick="showInstrumentForm('pustaka')" class="bg-amber-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-amber-600 transition">Mulai Kerjakan</button>
+                        </div>
+                        <div class="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                            <h3 class="font-bold text-lg mb-2">Instrumen Kajian Lapangan</h3>
+                            <p class="text-sm text-slate-500 mb-4">Isi lembar kajian lapangan berdasarkan hasil observasi Anda.</p>
+                            <button onclick="showInstrumentForm('lapangan')" class="bg-amber-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-amber-600 transition">Mulai Kerjakan</button>
+                        </div>
+                    </div>
+                    <div id="student-graded-assignments" class="mt-8">
+                        <h3 class="font-bold text-lg mb-4">Tugas Terkoreksi</h3>
+                        <div id="student-assignments-list" class="space-y-4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Teacher Dashboard -->
+            <div id="teacher-dashboard" class="hidden">
+                <div class="bg-white p-6 rounded-xl shadow-md mb-8">
+                    <h2 class="text-xl font-bold mb-4">Tugas Mahasiswa</h2>
+                    <p class="mb-6 text-slate-600">Berikut adalah daftar tugas yang telah dikumpulkan oleh mahasiswa dan menunggu untuk dinilai.</p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">Nama Mahasiswa</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">Judul Tugas</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">Jenis Instrumen</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">Status</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assignments-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                 <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-bold mb-4">Ringkasan Nilai Kelas</h2>
+                     <p class="mb-6 text-slate-600">Grafik ini menunjukkan distribusi skor akhir dari tugas yang telah dinilai untuk memberikan gambaran performa kelas secara keseluruhan.</p>
+                    <div class="chart-container">
+                        <canvas id="grades-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Grading View -->
+        <div id="grading-view" class="view">
+             <div class="bg-white p-6 rounded-xl shadow-md">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold">Formulir Penilaian</h2>
+                        <p id="grading-assignment-title" class="text-slate-600"></p>
+                        <p id="grading-student-name" class="text-slate-600 font-semibold"></p>
+                    </div>
+                    <button onclick="showView('main-app-view')" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition">Kembali ke Dasbor</button>
+                </div>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="font-bold text-lg mb-4 border-b pb-2">Jawaban Mahasiswa</h3>
+                        <div id="student-answers-container" class="space-y-4 text-sm"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg mb-4 border-b pb-2">Rubrik Penilaian</h3>
+                        <div id="grading-rubric-container" class="space-y-6"></div>
+                        <div class="mt-8 text-right">
+                             <button id="publish-grade-btn" class="bg-amber-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-amber-600 transition">Publikasikan Nilai</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Instrument Form View -->
+        <div id="instrument-form-view" class="view">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                         <h2 id="instrument-form-title" class="text-2xl font-bold"></h2>
+                         <p class="text-slate-600">Silakan isi semua kolom di bawah ini dengan jawaban yang mendalam.</p>
+                    </div>
+                    <button onclick="showView('main-app-view')" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition">Batal</button>
+                </div>
+                <form id="instrument-form" class="space-y-6">
+                    <input type="hidden" id="instrument-type-hidden">
+                    <div>
+                        <label for="assignment-title-input" class="block text-sm font-medium text-slate-700 mb-1">Judul Proyek/Tugas</label>
+                        <input type="text" id="assignment-title-input" class="w-full px-4 py-2 border border-slate-300 rounded-lg" required>
+                    </div>
+                    <div id="instrument-questions-container" class="space-y-6"></div>
+                    <div class="text-right">
+                        <button type="submit" class="bg-amber-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-amber-600 transition">Kumpulkan Tugas</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const db = {
+            users: [
+                { id: 1, identifier: '12345', name: 'Budi Santoso', role: 'mahasiswa' },
+                { id: 2, identifier: '54321', name: 'Citra Lestari', role: 'mahasiswa' },
+                { id: 3, identifier: '98765', name: 'Dr. Indah Permata', role: 'dosen' },
+            ],
+            assignments: [
+                { id: 101, studentId: 1, title: 'Analisis Sentimen Media Sosial', instrumentType: 'pustaka', status: 'dinilai', answers: { q1: 'Topik ini relevan karena...', q2: 'Studi oleh Smith (2020) adalah kunci...', q3: 'Kelemahan studi Smith adalah ukuran sampel...', q4: 'Teori A mendukung, Teori B menentang...', q5: 'Sintesis menunjukkan pola X...', q6: 'Celah penelitian ada di Y, solusi saya Z...' } },
+                { id: 102, studentId: 2, title: 'Observasi Perilaku Konsumen', instrumentType: 'lapangan', status: 'menunggu', answers: { q1: 'Fokus observasi adalah interaksi...', q2: 'Data dikumpulkan melalui wawancara...', q3: 'Temuan lapangan menentang teori...', q4: 'Catatan diorganisir per tema...', q5: 'Pola masalah adalah kurangnya informasi...', q6: 'Solusi yang diusulkan adalah aplikasi...' } },
+                 { id: 103, studentId: 1, title: 'Kajian Lapangan UMKM', instrumentType: 'lapangan', status: 'menunggu', answers: { q1: 'Fokus pada digitalisasi UMKM...', q2: 'Wawancara dengan 5 pemilik...', q3: 'Teori adopsi teknologi terbukti...', q4: 'Data dikelompokkan berdasarkan jenis usaha...', q5: 'Masalah utama adalah literasi digital...', q6: 'Solusi: Pelatihan intensif...' } },
+            ],
+            grades: [
+                { id: 201, assignmentId: 101, graderId: 3, finalScore: 85, scores: { q1: 4, q2: 4, q3: 3, q4: 4, q5: 3, q6: 4 }, comments: { q1: 'Argumen sangat jelas.', q2: 'Identifikasi studi relevan.', q3: 'Evaluasi bisa lebih kritis.', q4: 'Bagus.', q5: 'Sintesis cukup baik.', q6: 'Solusi inovatif.' } }
+            ],
+            instrumentQuestions: {
+                pustaka: [
+                    { id: 'q1', label: 'Embark and clarify', question: 'Tuliskan topik dari artikel yang sudah dibaca dalam bentuk paragraf yang berkaitan dengan proyek yang sedang dikembangkan.' },
+                    { id: 'q2', label: 'Find and generate', question: 'Jelaskan bagaimana hasil penelitian membentuk pemahaman konsep pada topik yang relevan dengan proyek.' },
+                    { id: 'q3', label: 'Evaluate and reflect', question: 'Analisis kelebihan dan kelemahan dari hasil penelitian, serta nilai relevansinya dengan proyek yang sedang dikembangkan.' },
+                    { id: 'q4', label: 'Organise and manage', question: 'Jelaskan bagaimana teori dalam penelitian menentang atau mendukung solusi terkait proyek.' },
+                    { id: 'q5', label: 'Analyse and synthesis', question: 'Jelaskan cara mensintesis dan menganalisis temuan, mengidentifikasi kesenjangan pengetahuan, serta mengintegrasikannya dengan teori yang relevan.' },
+                    { id: 'q6', label: 'Communication and apply', question: 'Jelaskan cara mengkomunikasikan solusi atau temuan penelitian menggunakan bahasa disiplin ilmu yang tepat dan perspektif multidisiplin.' }
+                ],
+                lapangan: [
+                    { id: 'q1', label: 'Embark and clarify', question: 'Tentukan fokus observasi dan identifikasi topik.' },
+                    { id: 'q2', label: 'Find and generate', question: 'Kumpulkan data konkret (melalui dokumentasi dan wawancara) dengan mempertimbangkan faktor-faktor etis, moral, sosial, dan budaya.' },
+                    { id: 'q3', label: 'Evaluate and reflect', question: 'Analisis dan evaluasi temuan di lapangan yang mungkin mendukung atau bertentangan dengan teori yang ada.' },
+                    { id: 'q4', label: 'Organise and manage', question: 'Susun atau organisir data atau catatan yang didapatkan di lapangan.' },
+                    { id: 'q5', label: 'Analyse and synthesis', question: 'Sintesis temuan, petakan pola masalah, dan integrasikan hasil observasi lapangan dengan teori dari kajian pustaka.' },
+                    { id: 'q6', label: 'Communication and apply', question: 'Berikan solusi yang memungkinkan untuk pengembangan produk berdasarkan temuan.' }
+                ]
+            },
+            rubric: {
+                q1: { 4: 'Sangat jelas & spesifik', 3: 'Cukup jelas', 2: 'Kurang jelas', 1: 'Sangat umum', 0: 'Tidak ada' },
+                q2: { 4: 'Identifikasi sangat relevan', 3: 'Cukup relevan', 2: 'Kurang relevan', 1: 'Tidak relevan', 0: 'Tidak ada' },
+                q3: { 4: 'Evaluasi sangat mendalam & kritis', 3: 'Evaluasi cukup kritis', 2: 'Evaluasi deskriptif', 1: 'Evaluasi dangkal', 0: 'Tidak ada' },
+                q4: { 4: 'Organisasi sangat sistematis', 3: 'Cukup sistematis', 2: 'Kurang terorganisir', 1: 'Tidak terstruktur', 0: 'Tidak ada' },
+                q5: { 4: 'Sintesis sangat komprehensif', 3: 'Sintesis cukup baik', 2: 'Sintesis parsial', 1: 'Sintesis minimal', 0: 'Tidak ada' },
+                q6: { 4: 'Solusi sangat inovatif & feasible', 3: 'Solusi logis', 2: 'Solusi umum', 1: 'Solusi tidak jelas', 0: 'Tidak ada' },
+            }
+        };
+
+        let currentUser = null;
+        let gradesChart = null;
+
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(view => view.classList.remove('active-view'));
+            document.getElementById(viewId).classList.add('active-view');
+        }
+
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const identifier = document.getElementById('identifier').value;
+            const user = db.users.find(u => u.identifier === identifier);
+
+            if (user) {
+                currentUser = user;
+                document.getElementById('login-error').textContent = '';
+                showView('main-app-view');
+                setupDashboard();
+            } else {
+                document.getElementById('login-error').textContent = 'NIM/NIDN tidak ditemukan.';
+            }
+        });
+        
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            currentUser = null;
+            showView('login-view');
+            document.getElementById('identifier').value = '';
+        });
+
+        function setupDashboard() {
+            document.getElementById('user-info').textContent = `Selamat datang, ${currentUser.name} (${currentUser.role})`;
+            if (currentUser.role === 'mahasiswa') {
+                document.getElementById('student-dashboard').style.display = 'block';
+                document.getElementById('teacher-dashboard').style.display = 'none';
+                renderStudentAssignments();
+            } else {
+                document.getElementById('student-dashboard').style.display = 'none';
+                document.getElementById('teacher-dashboard').style.display = 'block';
+                renderTeacherDashboard();
+            }
+        }
+        
+        function renderStudentAssignments() {
+            const listContainer = document.getElementById('student-assignments-list');
+            listContainer.innerHTML = '';
+            const myAssignments = db.assignments.filter(a => a.studentId === currentUser.id && a.status === 'dinilai');
+            
+            if (myAssignments.length === 0) {
+                listContainer.innerHTML = '<p class="text-slate-500 text-sm">Belum ada tugas yang dinilai.</p>';
+                return;
+            }
+
+            myAssignments.forEach(assignment => {
+                const grade = db.grades.find(g => g.assignmentId === assignment.id);
+                const card = document.createElement('div');
+                card.className = 'bg-slate-50 p-4 rounded-lg border border-slate-200';
+                card.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-bold">${assignment.title}</p>
+                            <p class="text-sm text-slate-500">Jenis: ${assignment.instrumentType}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-lg font-bold text-amber-600">${grade ? grade.finalScore : 'N/A'}</p>
+                            <p class="text-xs text-slate-500">Skor Akhir</p>
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        function renderTeacherDashboard() {
+            const tableBody = document.getElementById('assignments-table-body');
+            tableBody.innerHTML = '';
+            db.assignments.forEach(assignment => {
+                const student = db.users.find(u => u.id === assignment.studentId);
+                const row = document.createElement('tr');
+                row.className = 'border-b';
+                row.innerHTML = `
+                    <td class="py-3 px-4">${student.name}</td>
+                    <td class="py-3 px-4">${assignment.title}</td>
+                    <td class="py-3 px-4">${assignment.instrumentType}</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full ${assignment.status === 'dinilai' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${assignment.status}</span></td>
+                    <td class="py-3 px-4">
+                        <button onclick="startGrading(${assignment.id})" class="text-amber-600 hover:text-amber-800 text-sm font-semibold">
+                            ${assignment.status === 'dinilai' ? 'Lihat Detail' : 'Beri Nilai'}
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            renderGradesChart();
+        }
+        
+        function renderGradesChart() {
+            const ctx = document.getElementById('grades-chart').getContext('2d');
+            const gradedAssignments = db.assignments.filter(a => a.status === 'dinilai');
+            const labels = gradedAssignments.map(a => {
+                const student = db.users.find(u => u.id === a.studentId);
+                return `${student.name.split(' ')[0]} - ${a.title.substring(0, 10)}...`;
+            });
+            const data = gradedAssignments.map(a => {
+                const grade = db.grades.find(g => g.assignmentId === a.id);
+                return grade ? grade.finalScore : 0;
+            });
+
+            if (gradesChart) {
+                gradesChart.destroy();
+            }
+
+            gradesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Skor Akhir',
+                        data: data,
+                        backgroundColor: 'rgba(245, 158, 11, 0.6)',
+                        borderColor: 'rgba(217, 119, 6, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function startGrading(assignmentId) {
+            const assignment = db.assignments.find(a => a.id === assignmentId);
+            const student = db.users.find(u => u.id === assignment.studentId);
+            const grade = db.grades.find(g => g.assignmentId === assignmentId);
+
+            document.getElementById('grading-assignment-title').textContent = assignment.title;
+            document.getElementById('grading-student-name').textContent = `Oleh: ${student.name}`;
+
+            const answersContainer = document.getElementById('student-answers-container');
+            const rubricContainer = document.getElementById('grading-rubric-container');
+            answersContainer.innerHTML = '';
+            rubricContainer.innerHTML = '';
+
+            const questions = db.instrumentQuestions[assignment.instrumentType];
+
+            questions.forEach(q => {
+                answersContainer.innerHTML += `
+                    <div class="bg-slate-50 p-3 rounded-lg">
+                        <p class="font-semibold text-slate-700">${q.label}</p>
+                        <p class="text-slate-600 mt-1">${assignment.answers[q.id] || 'Tidak ada jawaban.'}</p>
+                    </div>
+                `;
+
+                const rubricItem = document.createElement('div');
+                let radioButtonsHTML = '';
+                Object.entries(db.rubric[q.id]).reverse().forEach(([score, desc]) => {
+                    const isChecked = grade && grade.scores[q.id] == score ? 'checked' : '';
+                    radioButtonsHTML += `
+                        <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-slate-100">
+                            <input type="radio" name="score-${q.id}" value="${score}" class="form-radio text-amber-500" ${isChecked}>
+                            <span class="font-bold w-6">${score}</span>
+                            <span class="text-sm text-slate-600">${desc}</span>
+                        </label>
+                    `;
+                });
+
+                rubricItem.innerHTML = `
+                    <div>
+                        <p class="font-semibold text-slate-800 mb-2">${q.label}</p>
+                        <div class="space-y-1">${radioButtonsHTML}</div>
+                        <textarea id="comment-${q.id}" class="w-full mt-3 px-3 py-2 text-sm border border-slate-300 rounded-lg" placeholder="Tambahkan komentar...">${grade && grade.comments[q.id] ? grade.comments[q.id] : ''}</textarea>
+                    </div>
+                `;
+                rubricContainer.appendChild(rubricItem);
+            });
+            
+            document.getElementById('publish-grade-btn').onclick = () => publishGrade(assignmentId);
+
+            showView('grading-view');
+        }
+        
+        function publishGrade(assignmentId) {
+            const scores = {};
+            const comments = {};
+            let totalScore = 0;
+            const questions = db.instrumentQuestions[db.assignments.find(a=>a.id === assignmentId).instrumentType];
+
+            questions.forEach(q => {
+                const selectedScore = document.querySelector(`input[name="score-${q.id}"]:checked`);
+                const scoreValue = selectedScore ? parseInt(selectedScore.value) : 0;
+                scores[q.id] = scoreValue;
+                comments[q.id] = document.getElementById(`comment-${q.id}`).value;
+                totalScore += scoreValue;
+            });
+            
+            const finalScore = Math.round((totalScore / (questions.length * 4)) * 100);
+            
+            const existingGradeIndex = db.grades.findIndex(g => g.assignmentId === assignmentId);
+            if (existingGradeIndex > -1) {
+                db.grades[existingGradeIndex] = { ...db.grades[existingGradeIndex], scores, comments, finalScore };
+            } else {
+                db.grades.push({
+                    id: Date.now(),
+                    assignmentId: assignmentId,
+                    graderId: currentUser.id,
+                    scores,
+                    comments,
+                    finalScore
+                });
+            }
+
+            const assignmentIndex = db.assignments.findIndex(a => a.id === assignmentId);
+            db.assignments[assignmentIndex].status = 'dinilai';
+            
+            alert('Nilai berhasil dipublikasikan!');
+            showView('main-app-view');
+            renderTeacherDashboard();
+        }
+        
+        function showInstrumentForm(type) {
+            document.getElementById('instrument-form-title').textContent = type === 'pustaka' ? 'Formulir Kajian Pustaka' : 'Formulir Kajian Lapangan';
+            document.getElementById('instrument-type-hidden').value = type;
+            
+            const questionsContainer = document.getElementById('instrument-questions-container');
+            questionsContainer.innerHTML = '';
+            const questions = db.instrumentQuestions[type];
+            
+            questions.forEach(q => {
+                questionsContainer.innerHTML += `
+                    <div>
+                        <label for="answer-${q.id}" class="block text-sm font-semibold text-slate-800 mb-1">${q.label}</label>
+                        <p class="text-xs text-slate-500 mb-2">${q.question}</p>
+                        <textarea id="answer-${q.id}" name="answer-${q.id}" rows="4" class="w-full px-4 py-2 border border-slate-300 rounded-lg" required></textarea>
+                    </div>
+                `;
+            });
+            
+            showView('instrument-form-view');
+        }
+
+        document.getElementById('instrument-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const type = document.getElementById('instrument-type-hidden').value;
+            const title = document.getElementById('assignment-title-input').value;
+            const answers = {};
+            const questions = db.instrumentQuestions[type];
+            
+            questions.forEach(q => {
+                answers[q.id] = document.getElementById(`answer-${q.id}`).value;
+            });
+            
+            db.assignments.push({
+                id: Date.now(),
+                studentId: currentUser.id,
+                title: title,
+                instrumentType: type,
+                status: 'menunggu',
+                answers: answers
+            });
+            
+            alert('Tugas berhasil dikumpulkan!');
+            document.getElementById('instrument-form').reset();
+            showView('main-app-view');
+        });
+
+    </script>
+</body>
+</html>
